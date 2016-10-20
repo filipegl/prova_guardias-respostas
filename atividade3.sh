@@ -3,16 +3,14 @@
 # Para o funcionamento do script, é necessário que este esteja no mesmo diretório das atividades. 
 # E também que não haja nenhum arquivo no diretório deste script chamado "temp.txt" e temp2.txt"
 # (Caso existam, serão removidos).
-# A funcionalidade adicional é uma lista dos alunos que acertaram e erraram.
+# A funcionalidade adicional é uma lista dos alunos que erraram.
 
-function certo_ou_errado(){
+function alunos_errados(){
 
 	diferenca=$(diff temp.txt EXERCICIO_"$n_exercicio"_$num_teste.out)
 
-	if [ "$diferenca" != "" ]; then
-		echo "ERRADO $nome_script" >> temp2.txt
-	else
-		echo "CERTO $nome_script" >> temp2.txt
+	if [ -n "$diferenca" ]; then
+		echo "  $num_teste   - $nome_script" >> temp2.txt
 	fi
 }
 
@@ -55,7 +53,7 @@ while [ $n_exercicio -le $qtd_exercicio ]; do
 
 			diff temp.txt EXERCICIO_"$n_exercicio"_$num_teste.out
 
-			certo_ou_errado
+			alunos_errados
 
 			echo ""
 			(( num_teste++ ))
@@ -66,7 +64,14 @@ done
 
 echo "----------------------------------"
 echo -ne "RESUMO: \n\n"
-sort temp2.txt | uniq
+echo "ALUNOS QUE ERRARAM"
+echo "TESTE - 	NOME"
+
+if [ -s temp2.txt ]; then
+	sort -g temp2.txt
+else
+	echo "  -   - 	  -"
+fi
 
 rm -f temp2.txt
 rm -f temp.txt
