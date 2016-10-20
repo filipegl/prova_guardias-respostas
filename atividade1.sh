@@ -1,57 +1,59 @@
-# coding: uft-8
 #!/bin/bash
-#OBS: O arquivo "access_log" precisa estar no mesmo diretório deste script.
-# ------------------------------------------------------------------------------------------
-#4)
-grep -e " - - " access_log > temp.txt
+# coding: uft-8
+# O arquivo "access_log" precisa estar no mesmo diretório deste script.
+# Caso exista um arquivo nomeado "temp.txt" no diretório deste script ele será removido.
+
+# 4)
+egrep "^(local|remote) - -" access_log > temp.txt
 mv temp.txt access_log
 
-#5)
-#a) ----------------------------------------------------------------------------------------
-linhas1=$(grep -e 'local' access_log | wc -l)
-echo "a) Quantas requisições locais foram feitas? $linhas1"
+# 5)
+# a)
+qtd_local=$(egrep '^local' access_log | wc -l)
+echo "a) Quantas requisições locais foram feitas? $qtd_local"
 
-#b) ----------------------------------------------------------------------------------------
-linhas2=$(grep -e 'remote' access_log | wc -l)
-echo "b) Quantas requisições remotas foram feitas? $linhas2"
+# b) 
+qtd_remote=$(egrep '^remote' access_log | wc -l)
+echo "b) Quantas requisições remotas foram feitas? $qtd_remote"
 
-#c) ----------------------------------------------------------------------------------------
-grep -e 'local' access_log > temp.txt
-soma1=0
+# c)
+soma_local=0
+horas=$(egrep '^local' access_log | cut -d: -f2)
 
-for num in $(cut -d: -f2 temp.txt); do
-	soma1=$(expr $num + $soma1)
+for num in $horas; do
+	soma_local=$(expr $num + $soma_local)
 done
 
-media1=$(expr $soma1 / $linhas1)
+media_local=$(echo "$soma_local / $qtd_local" | bc)
 
-echo "c) Em média, qual a hora em que as requisições locais são feitas? $media1 horas"
+echo "c) Em média, qual a hora em que as requisições locais são feitas? $media_local hora(s)"
 
-#d) ----------------------------------------------------------------------------------------
-grep -e 'remote' access_log > temp.txt
-soma2=0
+# d)
+soma_remote=0
+horas=$(egrep '^remote' access_log | cut -d: -f2)
 
-for num in $(cut -d: -f2 temp.txt); do
-	soma2=$(expr $num + $soma2)
+for num in $horas; do
+	soma_remote=$(expr $num + $soma_remote)
 done
 
-media2=$(expr $soma2 / $linhas2)
+media_remote=$(echo "$soma_remote / $qtd_remote" | bc)
 
-echo "d) Em média, qual a hora em que as requisições remotas são feitas? $media2 horas"
+echo "d) Em média, qual a hora em que as requisições remotas são feitas? $media_remote hora(s)"
 
-#-------------------------------------------------------------------------------------------
-#6)
-#funcionalidades
+# 6)
+
+# Funcionalidades:
 echo "-------
 Extras: 
 -------"
-#1 -----------------------------------------------------------------------------------------
-if [ $linhas1 -gt $linhas2 ]; then
-	sub=$(expr $linhas1 - $linhas2)
+
+# 1 Diferença de requisições remotas e locais
+if [ $qtd_local -gt $qtd_remote ]; then
+	sub=$(expr $qtd_local - $qtd_remote)
 	echo "Existem $sub requisições locais a mais que requisições remotas.
 "
-elif [ $linhas2 -gt $linhas1 ]; then
-	sub=$(expr $linhas2 - $linhas1)
+elif [ $qtd_remote -gt $qtd_local ]; then
+	sub=$(expr $qtd_remote - $qtd_local)
 	echo "Existem $sub requisições remotas a mais que requisições locais.
 "
 else
@@ -59,39 +61,34 @@ else
 "
 fi
 
-#2 média dos tamanhos -----------------------------------------------------------------------
-soma=0
-linhas=0
-for tam in $(awk '{if ($NF != "-") print $NF}' access_log); do
-		soma=$(expr $soma + $tam)
+# 2 Média dos tamanhos 
+total=0
+
+for tam in $(awk '{print $NF}' access_log | egrep "^[0-9]{1,}$"); do
+		total=$(expr $total + $tam)
 done
-linhas=$(awk '{if ($NF != "-") print $NF}' access_log | wc -l)
-media=$(expr $soma / $linhas)
-echo "A média dos tamanhos das requisições é aproximadamente $media.
+
+linhas=$(expr $qtd_local + $qtd_remote)
+media=$(echo "scale=2 ; $total / $linhas" | bc)
+echo "A média dos tamanhos das requisições é $media.
 "
 
-#3 data do dia que mais ocorreu requisição --------------------------------------------------
-maior=0
-for dia in {1..31}; do
-	qtd=$(grep -e "$dia/" access_log | wc -l)
-	if [ $qtd -gt $maior ]; then
-		maior=$qtd
-		maiordia=$dia
-	fi
-done
-echo "O dia $maiordia (idependente do mês) foi o dia que mais requisições foram feitas.
+# 3 Dia em que mais/menos ocorreu requisição
+maior_dia=$(cut -d"[" -f2 access_log | cut -d":" -f1 | sort -g | uniq -c | sort -g | tail -n1 | awk '{print $2}')
+
+vezes_maior_dia=$(cut -d"[" -f2 access_log | cut -d":" -f1 | sort -g | uniq -c | sort -g | tail -n1 | awk '{print $1}')
+
+menor_dia=$(cut -d"[" -f2 access_log | cut -d":" -f1 | sort -g | uniq -c | sort -g | head -n1 | awk '{print $2}')
+
+vezes_menor_dia=$(cut -d"[" -f2 access_log | cut -d":" -f1 | sort -g | uniq -c | sort -g | head -n1 | awk '{print $1}')
+
+echo "O dia $maior_dia foi o dia em que mais requisições foram feitas, sendo $vezes_maior_dia requisições.
+"
+echo "O dia $menor_dia foi o dia em que menos requisições foram feitas, sendo $vezes_menor_dia requisições.
 "
 
-#4 hora do dia que mais ocorreu requisição ---------------------------------------------------
-maior=0
-for hora in {0..23}; do
-	qtd=$(grep "$hora:[0-6][0-9]:" access_log | wc -l)
-	if [ $qtd -gt $maior ]; then
-		maior=$qtd
-		maiorhr=$hora
-	fi
-done
-echo "O horário do dia mais acessado (idependente da data) foi à(s) $maiorhr hora(s).
+# 4 Hora do dia que mais ocorreu requisição
+maior_hora=$(cut -d: -f2 access_log | sort -g | uniq -c | sort -g | awk '{print $2}' | tail -n1)
+
+echo "O horário do dia mais acessado é às $maior_hora horas.
 "
-
-
